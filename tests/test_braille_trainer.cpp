@@ -46,11 +46,13 @@ int main() {
   assert(trainer.incorrectAttempts() == 1);
   assert(trainer.confirm() == braille::ConfirmResult::Incorrect);
   assert(trainer.incorrectAttempts() == 2);
-  assert(trainer.confirm() == braille::ConfirmResult::AnswerRevealed);
-  assert(trainer.answerVisible());
-  assert(trainer.displayedPattern() == braille::patternForLetter('B'));
-  assert(!trainer.toggleDot(2));
-  assert(trainer.confirm() == braille::ConfirmResult::Unavailable);
+  assert(trainer.confirm() == braille::ConfirmResult::Incorrect);
+  assert(trainer.incorrectAttempts() == 3);
+  assert(!trainer.answerVisible());
+  assert(trainer.displayedPattern() == trainer.entryPattern());
+  assert(trainer.toggleDot(2));
+  assert(trainer.confirm() == braille::ConfirmResult::Correct);
+  assert(trainer.incorrectAttempts() == 0);
 
   trainer.clearEntry();
   assert(!trainer.answerVisible());
@@ -60,6 +62,8 @@ int main() {
   trainer.showAnswer();
   assert(trainer.answerVisible());
   assert(trainer.displayedPattern() == braille::patternForLetter('B'));
+  assert(!trainer.toggleDot(2));
+  assert(trainer.confirm() == braille::ConfirmResult::Unavailable);
 
   trainer.setMode(braille::Mode::Learning);
   assert(!trainer.answerVisible());

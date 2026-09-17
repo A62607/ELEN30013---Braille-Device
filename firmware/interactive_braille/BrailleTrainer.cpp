@@ -90,11 +90,6 @@ ConfirmResult BrailleTrainer::confirm() {
   }
 
   ++incorrectAttempts_;
-  if (incorrectAttempts_ >= 3) {
-    answerVisible_ = true;
-    return ConfirmResult::AnswerRevealed;
-  }
-
   return ConfirmResult::Incorrect;
 }
 

@@ -27,8 +27,7 @@ The prototype currently provides:
 - Target-letter selection and wrap-around navigation.
 - A logical six-dot practice entry with individual dot toggling.
 - Correct/incorrect assessment.
-- Automatic answer display after three incorrect submissions.
-- Clear and Show Answer operations.
+- Clear and manually controlled Show Answer operations.
 - A non-blocking Serial command interface.
 
 The state and learning rules are independent from Arduino hardware in

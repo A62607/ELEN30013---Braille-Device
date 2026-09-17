@@ -18,19 +18,64 @@ Physical cell       Stored bits
 For example, the letter C uses dots 1 and 4, so its stored value is
 `0b001001`.
 
-## Current milestone
+## Current software prototype
 
-- Store the Grade 1 English Braille patterns for A-Z.
-- Look up patterns using uppercase or lowercase letters.
-- Print the full table over the Arduino serial monitor for inspection.
-- Verify all 26 entries with a host-side test.
+The prototype currently provides:
 
-## Running the Arduino demonstration
+- Grade 1 English Braille patterns for A-Z.
+- Learning and Practice modes.
+- Target-letter selection and wrap-around navigation.
+- A logical six-dot practice entry with individual dot toggling.
+- Correct/incorrect assessment.
+- Automatic answer display after three incorrect submissions.
+- Clear and Show Answer operations.
+- A non-blocking Serial command interface.
+
+The state and learning rules are independent from Arduino hardware in
+`BrailleTrainer`. They can be tested on a computer now and connected to
+buttons, sensors, servos, and audio later.
+
+## Running the Arduino prototype
 
 Open `firmware/interactive_braille/interactive_braille.ino` in the Arduino
-IDE, select an Arduino Uno, upload it, and open the serial monitor at 9600 baud.
+IDE, select an Arduino Uno, upload it, and open the Serial Monitor at 9600 baud.
+Set the line ending to **Newline** or **Both NL & CR**.
 
-## Running the host-side test
+Available commands:
+
+```text
+A-Z              select target letter
+learn [A-Z]      enter Learning Mode
+practice [A-Z]   enter Practice Mode
+dot 1..6         toggle a practice dot
+1..6             shortcut for dot 1..6
+confirm          assess the entry
+clear            clear entry and attempts
+show             display the answer
+next / previous  change target letter
+status           display current state
+alphabet         list all patterns
+help             show commands
+```
+
+Example practice session for the letter C:
+
+```text
+practice C
+1
+4
+confirm
+```
+
+The logical cell uses `O` for a raised dot and `.` for a lowered dot:
+
+```text
+O O
+. .
+. .
+```
+
+## Running the host-side tests
 
 From the repository root:
 
@@ -41,5 +86,12 @@ c++ -std=c++11 -Wall -Wextra -Werror \
   -o /tmp/test_braille_patterns
 
 /tmp/test_braille_patterns
-```
 
+c++ -std=c++11 -Wall -Wextra -Werror \
+  tests/test_braille_trainer.cpp \
+  firmware/interactive_braille/BraillePatterns.cpp \
+  firmware/interactive_braille/BrailleTrainer.cpp \
+  -o /tmp/test_braille_trainer
+
+/tmp/test_braille_trainer
+```

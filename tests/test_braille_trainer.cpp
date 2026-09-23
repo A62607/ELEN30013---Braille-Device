@@ -38,26 +38,20 @@ int main() {
   assert(trainer.toggleDot(4));
   assert(trainer.entryPattern() == braille::patternForLetter('C'));
   assert(trainer.confirm() == braille::ConfirmResult::Correct);
-  assert(trainer.incorrectAttempts() == 0);
 
   trainer.setTargetLetter('B');
   assert(trainer.toggleDot(1));
   assert(trainer.confirm() == braille::ConfirmResult::Incorrect);
-  assert(trainer.incorrectAttempts() == 1);
   assert(trainer.confirm() == braille::ConfirmResult::Incorrect);
-  assert(trainer.incorrectAttempts() == 2);
   assert(trainer.confirm() == braille::ConfirmResult::Incorrect);
-  assert(trainer.incorrectAttempts() == 3);
   assert(!trainer.answerVisible());
   assert(trainer.displayedPattern() == trainer.entryPattern());
   assert(trainer.toggleDot(2));
   assert(trainer.confirm() == braille::ConfirmResult::Correct);
-  assert(trainer.incorrectAttempts() == 0);
 
   trainer.clearEntry();
   assert(!trainer.answerVisible());
   assert(trainer.entryPattern() == 0);
-  assert(trainer.incorrectAttempts() == 0);
 
   trainer.showAnswer();
   assert(trainer.answerVisible());

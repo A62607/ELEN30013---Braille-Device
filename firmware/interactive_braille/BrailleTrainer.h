@@ -41,7 +41,6 @@ namespace braille
     ConfirmResult confirm();
     void showAnswer();
     bool answerVisible() const;
-    uint8_t incorrectAttempts() const;
 
   private:
     void resetPracticeSession();
@@ -49,7 +48,6 @@ namespace braille
     Mode mode_;
     uint8_t targetIndex_;
     uint8_t entryPattern_;
-    uint8_t incorrectAttempts_;
     bool answerVisible_;
   };
 

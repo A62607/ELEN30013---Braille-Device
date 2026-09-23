@@ -71,8 +71,6 @@ namespace
     {
       Serial.print(F("View: "));
       Serial.println(trainer.answerVisible() ? F("answer") : F("entry"));
-      Serial.print(F("Incorrect attempts: "));
-      Serial.println(trainer.incorrectAttempts());
     }
 
     Serial.print(F("Bits: "));
@@ -106,7 +104,7 @@ namespace
     Serial.println(F("  practice [A-Z]   enter Practice Mode"));
     Serial.println(F("  dot 1..6 or 1..6 toggle a practice dot"));
     Serial.println(F("  confirm          assess the entry"));
-    Serial.println(F("  clear            clear entry and attempts"));
+    Serial.println(F("  clear            clear entry"));
     Serial.println(F("  show             display the answer"));
     Serial.println(F("  next / previous  change target letter"));
     Serial.println(F("  status           display current state"));
@@ -226,7 +224,7 @@ namespace
     else if (strcmp(command, "clear") == 0)
     {
       trainer.clearEntry();
-      Serial.println(F("Entry and attempt count cleared."));
+      Serial.println(F("Entry cleared."));
       printState();
     }
     else if (strcmp(command, "show") == 0)

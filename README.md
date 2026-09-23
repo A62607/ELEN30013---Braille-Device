@@ -49,7 +49,7 @@ practice [A-Z]   enter Practice Mode
 dot 1..6         toggle a practice dot
 1..6             shortcut for dot 1..6
 confirm          assess the entry
-clear            clear entry and attempts
+clear            clear entry
 show             display the answer
 next / previous  change target letter
 status           display current state

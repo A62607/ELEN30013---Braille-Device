@@ -8,7 +8,6 @@ BrailleTrainer::BrailleTrainer()
     : mode_(Mode::Learning),
       targetIndex_(0),
       entryPattern_(0),
-      incorrectAttempts_(0),
       answerVisible_(false) {}
 
 Mode BrailleTrainer::mode() const {
@@ -85,11 +84,9 @@ ConfirmResult BrailleTrainer::confirm() {
   }
 
   if (entryPattern_ == targetPattern()) {
-    incorrectAttempts_ = 0;
     return ConfirmResult::Correct;
   }
 
-  ++incorrectAttempts_;
   return ConfirmResult::Incorrect;
 }
 
@@ -101,13 +98,8 @@ bool BrailleTrainer::answerVisible() const {
   return answerVisible_;
 }
 
-uint8_t BrailleTrainer::incorrectAttempts() const {
-  return incorrectAttempts_;
-}
-
 void BrailleTrainer::resetPracticeSession() {
   entryPattern_ = 0;
-  incorrectAttempts_ = 0;
   answerVisible_ = false;
 }
 

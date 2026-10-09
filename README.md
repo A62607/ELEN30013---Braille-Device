@@ -25,6 +25,7 @@ The prototype currently provides:
 - Grade 1 English Braille patterns for A-Z.
 - Learning and Practice modes.
 - Target-letter selection and wrap-around navigation.
+- Random initial and Next targets in Practice Mode.
 - A logical six-dot practice entry with individual dot toggling.
 - Correct/incorrect assessment.
 - Clear and manually controlled Show Answer operations.
@@ -45,13 +46,13 @@ Available commands:
 ```text
 A-Z              select target letter
 learn [A-Z]      enter Learning Mode
-practice [A-Z]   enter Practice Mode
+practice [A-Z]   enter Practice; random if letter omitted
 dot 1..6         toggle a practice dot
 1..6             shortcut for dot 1..6
 confirm          assess the entry
 clear            clear entry
 show             display the answer
-next / previous  change target letter
+next / previous  change target; Next random in Practice
 status           display current state
 alphabet         list all patterns
 help             show commands

@@ -13,6 +13,69 @@ namespace
   char inputBuffer[kInputBufferSize];
   uint8_t inputLength = 0;
   bool inputOverflow = false;
+  bool randomSeeded = false;
+  uint8_t lastHardwarePattern = braille::kInvalidPattern;
+
+  // Hardware adapter points. Replace these no-op bodies after the pin map,
+  // servo angles, FSR thresholds, button wiring, and audio files are fixed.
+  void hardwareBegin()
+  {
+    // Initialize FSR inputs, the 74HC165, servos, audio, and haptic output.
+  }
+
+  void hardwareApplyDisplayedPattern(uint8_t pattern)
+  {
+    // Command each dot actuator from bits 0-5 of pattern.
+    (void)pattern;
+  }
+
+  void hardwareOnConfirmResult(braille::ConfirmResult result)
+  {
+    // Map Correct/Incorrect/Unavailable to audio or haptic feedback.
+    (void)result;
+  }
+
+  void hardwareUpdate()
+  {
+    // Advance any non-blocking servo, audio, or haptic activity.
+  }
+
+  void seedRandomOnce()
+  {
+    if (randomSeeded)
+    {
+      return;
+    }
+
+    // Practice begins after a human input, so micros() varies between runs.
+    randomSeed(micros());
+    randomSeeded = true;
+  }
+
+  char randomPracticeLetter()
+  {
+    seedRandomOnce();
+    const uint8_t index =
+        static_cast<uint8_t>(random(braille::kLetterCount));
+    return static_cast<char>('A' + index);
+  }
+
+  char randomDifferentPracticeLetter()
+  {
+    seedRandomOnce();
+
+    const uint8_t current =
+        static_cast<uint8_t>(trainer.targetLetter() - 'A');
+    uint8_t next =
+        static_cast<uint8_t>(random(braille::kLetterCount - 1));
+
+    if (next >= current)
+    {
+      ++next;
+    }
+
+    return static_cast<char>('A' + next);
+  }
 
   void printSixBits(uint8_t pattern)
   {
@@ -81,6 +144,24 @@ namespace
     printCell(pattern);
   }
 
+  void syncHardwareOutputs()
+  {
+    const uint8_t pattern = trainer.displayedPattern();
+    if (pattern == lastHardwarePattern)
+    {
+      return;
+    }
+
+    hardwareApplyDisplayedPattern(pattern);
+    lastHardwarePattern = pattern;
+  }
+
+  void publishState()
+  {
+    syncHardwareOutputs();
+    printState();
+  }
+
   void printAlphabet()
   {
     Serial.println(F("Letter  Bits    Raised dots"));
@@ -101,12 +182,12 @@ namespace
     Serial.println(F("Commands:"));
     Serial.println(F("  A-Z              select target letter"));
     Serial.println(F("  learn [A-Z]      enter Learning Mode"));
-    Serial.println(F("  practice [A-Z]   enter Practice Mode"));
+    Serial.println(F("  practice [A-Z]   Practice; random if letter omitted"));
     Serial.println(F("  dot 1..6 or 1..6 toggle a practice dot"));
     Serial.println(F("  confirm          assess the entry"));
     Serial.println(F("  clear            clear entry"));
     Serial.println(F("  show             display the answer"));
-    Serial.println(F("  next / previous  change target letter"));
+    Serial.println(F("  next / previous  change target; Next random in Practice"));
     Serial.println(F("  status           display current state"));
     Serial.println(F("  alphabet         list all patterns"));
     Serial.println(F("  help             show commands"));
@@ -130,6 +211,83 @@ namespace
            braille::patternForLetter(text[0]) != braille::kInvalidPattern;
   }
 
+  bool performSetMode(braille::Mode mode, char targetLetter)
+  {
+    if (mode == braille::Mode::Practice && targetLetter == '\0')
+    {
+      targetLetter = randomPracticeLetter();
+    }
+
+    if (targetLetter != '\0' &&
+        braille::patternForLetter(targetLetter) == braille::kInvalidPattern)
+    {
+      return false;
+    }
+
+    trainer.setMode(mode);
+    if (targetLetter != '\0')
+    {
+      trainer.setTargetLetter(targetLetter);
+    }
+    publishState();
+    return true;
+  }
+
+  bool performSelectTarget(char letter)
+  {
+    if (!trainer.setTargetLetter(letter))
+    {
+      return false;
+    }
+
+    publishState();
+    return true;
+  }
+
+  bool performToggleDot(uint8_t dotNumber)
+  {
+    if (!trainer.toggleDot(dotNumber))
+    {
+      return false;
+    }
+
+    publishState();
+    return true;
+  }
+
+  void performClear()
+  {
+    trainer.clearEntry();
+    Serial.println(F("Entry cleared."));
+    publishState();
+  }
+
+  void performShowAnswer()
+  {
+    trainer.showAnswer();
+    Serial.println(F("Showing answer."));
+    publishState();
+  }
+
+  void performNextTarget()
+  {
+    if (trainer.mode() == braille::Mode::Practice)
+    {
+      trainer.setTargetLetter(randomDifferentPracticeLetter());
+    }
+    else
+    {
+      trainer.nextTarget();
+    }
+    publishState();
+  }
+
+  void performPreviousTarget()
+  {
+    trainer.previousTarget();
+    publishState();
+  }
+
   void handleMode(braille::Mode mode, const char *letter)
   {
     if (letter != nullptr && !validLetter(letter))
@@ -138,12 +296,7 @@ namespace
       return;
     }
 
-    trainer.setMode(mode);
-    if (letter != nullptr)
-    {
-      trainer.setTargetLetter(letter[0]);
-    }
-    printState();
+    performSetMode(mode, letter == nullptr ? '\0' : letter[0]);
   }
 
   void handleDot(const char *text)
@@ -165,13 +318,15 @@ namespace
       return;
     }
 
-    trainer.toggleDot(static_cast<uint8_t>(text[0] - '0'));
-    printState();
+    performToggleDot(static_cast<uint8_t>(text[0] - '0'));
   }
 
   void handleConfirm()
   {
-    switch (trainer.confirm())
+    const braille::ConfirmResult result = trainer.confirm();
+    hardwareOnConfirmResult(result);
+
+    switch (result)
     {
     case braille::ConfirmResult::Correct:
       Serial.println(F("Correct."));
@@ -183,7 +338,7 @@ namespace
       Serial.println(F("Error: Confirm requires an editable Practice entry."));
       return;
     }
-    printState();
+    publishState();
   }
 
   void processCommand(char *line)
@@ -198,8 +353,7 @@ namespace
 
     if (command[1] == '\0' && command[0] >= 'a' && command[0] <= 'z')
     {
-      trainer.setTargetLetter(command[0]);
-      printState();
+      performSelectTarget(command[0]);
     }
     else if (command[1] == '\0' && command[0] >= '1' && command[0] <= '6')
     {
@@ -223,25 +377,19 @@ namespace
     }
     else if (strcmp(command, "clear") == 0)
     {
-      trainer.clearEntry();
-      Serial.println(F("Entry cleared."));
-      printState();
+      performClear();
     }
     else if (strcmp(command, "show") == 0)
     {
-      trainer.showAnswer();
-      Serial.println(F("Showing answer."));
-      printState();
+      performShowAnswer();
     }
     else if (strcmp(command, "next") == 0)
     {
-      trainer.nextTarget();
-      printState();
+      performNextTarget();
     }
     else if (strcmp(command, "previous") == 0 || strcmp(command, "prev") == 0)
     {
-      trainer.previousTarget();
-      printState();
+      performPreviousTarget();
     }
     else if (strcmp(command, "status") == 0)
     {
@@ -259,6 +407,10 @@ namespace
     {
       Serial.println(F("Unknown command. Enter 'help'."));
     }
+  }
+
+  void processHardwareInput()
+  {
   }
 
   void processSerialInput()
@@ -306,15 +458,20 @@ void setup()
     // The Arduino Uno continues immediately.
   }
 
+  hardwareBegin();
+
   Serial.println(F("Interactive Braille software prototype"));
   Serial.println(F("Raised dot = O, lowered dot = ."));
   printHelp();
   Serial.println();
-  printState();
+  publishState();
   Serial.print(F("> "));
 }
 
 void loop()
 {
   processSerialInput();
+  processHardwareInput();
+  syncHardwareOutputs();
+  hardwareUpdate();
 }

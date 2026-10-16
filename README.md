@@ -26,7 +26,7 @@ The prototype currently provides:
 - Learning and Practice modes.
 - Target-letter selection and wrap-around navigation.
 - Random initial and Next targets in Practice Mode.
-- A logical six-dot practice entry with individual dot toggling.
+- A logical six-dot practice entry in which dots can only be raised.
 - Correct/incorrect assessment.
 - Clear and manually controlled Show Answer operations.
 - A non-blocking Serial command interface.
@@ -47,7 +47,7 @@ Available commands:
 A-Z              select target letter
 learn [A-Z]      enter Learning Mode
 practice [A-Z]   enter Practice; random if letter omitted
-dot 1..6         toggle a practice dot
+dot 1..6         raise a practice dot
 1..6             shortcut for dot 1..6
 confirm          assess the entry
 clear            clear entry
@@ -74,6 +74,26 @@ O O
 . .
 . .
 ```
+
+## Hardware configuration
+
+Hardware values and pin assignments are kept in
+`firmware/interactive_braille/HardwareConfig.h`. The current configuration is:
+
+- FSR inputs: A0-A5, pressed at an ADC value of 300 or higher for 50 ms.
+- Servo signals: digital pins 2-7.
+- 74HC165 load, clock, and data: digital pins 8, 9, and 10.
+- Functional-button debounce: 30 ms.
+- Servo positions: 10 degrees lowered and 150 degrees raised.
+
+Normal input only raises dots. Pressing Clear lowers all six servos and clears
+the logical entry; no other action lowers an individual dot. Clear the cell
+before moving to a different target so previously raised physical dots do not
+remain in the next pattern.
+
+The 74HC165 input is sampled and debounced, but the bit-to-button mapping and
+active level still need to be matched to the final wiring before the physical
+buttons can invoke Learning, Practice, Confirm, Clear, Show Answer, or Next.
 
 ## Running the host-side tests
 

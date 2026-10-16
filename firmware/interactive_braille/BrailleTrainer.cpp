@@ -77,7 +77,7 @@ namespace braille
     return entryPattern_;
   }
 
-  bool BrailleTrainer::toggleDot(uint8_t dotNumber)
+  bool BrailleTrainer::raiseDot(uint8_t dotNumber)
   {
     if (mode_ != Mode::Practice || answerVisible_ || dotNumber < 1 ||
         dotNumber > 6)
@@ -85,7 +85,13 @@ namespace braille
       return false;
     }
 
-    entryPattern_ ^= uint8_t{1} << (dotNumber - 1);
+    const uint8_t dotMask = uint8_t{1} << (dotNumber - 1);
+    if ((entryPattern_ & dotMask) != 0)
+    {
+      return false;
+    }
+
+    entryPattern_ = static_cast<uint8_t>(entryPattern_ | dotMask);
     return true;
   }
 

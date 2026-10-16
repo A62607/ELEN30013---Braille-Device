@@ -35,7 +35,7 @@ namespace braille
 
     uint8_t entryPattern() const;
     uint8_t displayedPattern() const;
-    bool toggleDot(uint8_t dotNumber);
+    bool raiseDot(uint8_t dotNumber);
     void clearEntry();
 
     ConfirmResult confirm();

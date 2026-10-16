@@ -1,8 +1,10 @@
 #include <Arduino.h>
+#include <Servo.h>
 #include <string.h>
 
 #include "BraillePatterns.h"
 #include "BrailleTrainer.h"
+#include "HardwareConfig.h"
 
 namespace
 {
@@ -16,17 +18,84 @@ namespace
   bool randomSeeded = false;
   uint8_t lastHardwarePattern = braille::kInvalidPattern;
 
-  // Hardware adapter points. Replace these no-op bodies after the pin map,
-  // servo angles, FSR thresholds, button wiring, and audio files are fixed.
+  Servo dotServos[hardware::kDotCount];
+  uint8_t raisedHardwarePattern = 0;
+
+  unsigned long fsrPressStartedAt[hardware::kDotCount] = {};
+  bool fsrTimingPress[hardware::kDotCount] = {};
+  bool fsrPressLatched[hardware::kDotCount] = {};
+
+  bool buttonSampleInitialized = false;
+  uint8_t lastRawButtonState = 0;
+  uint8_t debouncedButtonState = 0;
+  unsigned long buttonStateChangedAt = 0;
+
   void hardwareBegin()
   {
-    // Initialize FSR inputs, the 74HC165, servos, audio, and haptic output.
+    for (uint8_t dot = 0; dot < hardware::kDotCount; ++dot)
+    {
+      pinMode(hardware::kFsrPins[dot], INPUT);
+
+      dotServos[dot].write(hardware::kServoLoweredAngle);
+      dotServos[dot].attach(hardware::kServoPins[dot]);
+    }
+
+    raisedHardwarePattern = 0;
+
+    pinMode(hardware::kButtonLoadPin, OUTPUT);
+    pinMode(hardware::kButtonClockPin, OUTPUT);
+    pinMode(hardware::kButtonDataPin, INPUT);
+
+    digitalWrite(hardware::kButtonLoadPin, HIGH);
+    digitalWrite(hardware::kButtonClockPin, LOW);
   }
 
   void hardwareApplyDisplayedPattern(uint8_t pattern)
   {
-    // Command each dot actuator from bits 0-5 of pattern.
-    (void)pattern;
+    // Normal actions may only raise dots. Clear is the only operation that
+    // lowers them, so a smaller pattern never drives a raised servo down.
+    const uint8_t newlyRaised =
+        static_cast<uint8_t>(pattern & ~raisedHardwarePattern);
+
+    for (uint8_t dot = 0; dot < hardware::kDotCount; ++dot)
+    {
+      if (braille::isDotRaised(newlyRaised, dot + 1))
+      {
+        dotServos[dot].write(hardware::kServoRaisedAngle);
+      }
+    }
+
+    raisedHardwarePattern =
+        static_cast<uint8_t>(raisedHardwarePattern | pattern);
+  }
+
+  void hardwareLowerAllDots()
+  {
+    for (uint8_t dot = 0; dot < hardware::kDotCount; ++dot)
+    {
+      dotServos[dot].write(hardware::kServoLoweredAngle);
+    }
+
+    raisedHardwarePattern = 0;
+  }
+
+  uint8_t readButtonRegister()
+  {
+    digitalWrite(hardware::kButtonLoadPin, LOW);
+    delayMicroseconds(5);
+    digitalWrite(hardware::kButtonLoadPin, HIGH);
+    return shiftIn(hardware::kButtonDataPin,
+                   hardware::kButtonClockPin,
+                   MSBFIRST);
+  }
+
+  void handleDebouncedButtonState(uint8_t previousState,
+                                  uint8_t currentState)
+  {
+    // The 74HC165 bit-to-button mapping and active level still need to be
+    // confirmed from the final wiring before these bits trigger actions.
+    (void)previousState;
+    (void)currentState;
   }
 
   void hardwareOnConfirmResult(braille::ConfirmResult result)
@@ -183,7 +252,7 @@ namespace
     Serial.println(F("  A-Z              select target letter"));
     Serial.println(F("  learn [A-Z]      enter Learning Mode"));
     Serial.println(F("  practice [A-Z]   Practice; random if letter omitted"));
-    Serial.println(F("  dot 1..6 or 1..6 toggle a practice dot"));
+    Serial.println(F("  dot 1..6 or 1..6 raise a practice dot"));
     Serial.println(F("  confirm          assess the entry"));
     Serial.println(F("  clear            clear entry"));
     Serial.println(F("  show             display the answer"));
@@ -244,9 +313,9 @@ namespace
     return true;
   }
 
-  bool performToggleDot(uint8_t dotNumber)
+  bool performRaiseDot(uint8_t dotNumber)
   {
-    if (!trainer.toggleDot(dotNumber))
+    if (!trainer.raiseDot(dotNumber))
     {
       return false;
     }
@@ -258,8 +327,13 @@ namespace
   void performClear()
   {
     trainer.clearEntry();
+    hardwareLowerAllDots();
+
+    // Clear intentionally leaves the physical cell lowered even in Learning
+    // Mode, where displayedPattern() still describes the target letter.
+    lastHardwarePattern = trainer.displayedPattern();
     Serial.println(F("Entry cleared."));
-    publishState();
+    printState();
   }
 
   void performShowAnswer()
@@ -318,7 +392,7 @@ namespace
       return;
     }
 
-    performToggleDot(static_cast<uint8_t>(text[0] - '0'));
+    performRaiseDot(static_cast<uint8_t>(text[0] - '0'));
   }
 
   void handleConfirm()
@@ -411,6 +485,65 @@ namespace
 
   void processHardwareInput()
   {
+    const unsigned long now = millis();
+
+    for (uint8_t dot = 0; dot < hardware::kDotCount; ++dot)
+    {
+      const uint16_t reading = analogRead(hardware::kFsrPins[dot]);
+
+      if (fsrPressLatched[dot])
+      {
+        if (reading < hardware::kFsrReleaseThreshold)
+        {
+          fsrPressLatched[dot] = false;
+          fsrTimingPress[dot] = false;
+        }
+        continue;
+      }
+
+      if (reading >= hardware::kFsrPressThreshold)
+      {
+        if (!fsrTimingPress[dot])
+        {
+          fsrTimingPress[dot] = true;
+          fsrPressStartedAt[dot] = now;
+        }
+        else if (now - fsrPressStartedAt[dot] >=
+                 hardware::kFsrPressDurationMs)
+        {
+          fsrTimingPress[dot] = false;
+          fsrPressLatched[dot] = true;
+          performRaiseDot(dot + 1);
+        }
+      }
+      else
+      {
+        fsrTimingPress[dot] = false;
+      }
+    }
+
+    const uint8_t rawButtonState = readButtonRegister();
+    if (!buttonSampleInitialized)
+    {
+      buttonSampleInitialized = true;
+      lastRawButtonState = rawButtonState;
+      debouncedButtonState = rawButtonState;
+      buttonStateChangedAt = now;
+      return;
+    }
+
+    if (rawButtonState != lastRawButtonState)
+    {
+      lastRawButtonState = rawButtonState;
+      buttonStateChangedAt = now;
+    }
+    else if (rawButtonState != debouncedButtonState &&
+             now - buttonStateChangedAt >= hardware::kButtonDebounceMs)
+    {
+      const uint8_t previousState = debouncedButtonState;
+      debouncedButtonState = rawButtonState;
+      handleDebouncedButtonState(previousState, debouncedButtonState);
+    }
   }
 
   void processSerialInput()

@@ -11,18 +11,14 @@
 // bit:       5 4 3 2 1 0
 // Braille:   6 5 4 3 2 1
 
-// name space grounps related function names and make them more distinguishable
-// function call become braille::patternForLetter(),
-// instead of patternForLetter()
+// name space, function call become braille::patternForLetter() instead of patternForLetter()
 
 namespace braille
 {
-  // anonymous namespace, intended to be private to other files
+  // private namespace
   namespace
   {
 
-// defining array, const unint8_t is array data type, const - unchageable, drop the const
-// to make the array changable
 #if defined(ARDUINO_ARCH_AVR)
     // keep lookup table in program flash rather than runtime SRAM
     const uint8_t kLetterPatterns[kLetterCount] PROGMEM = {

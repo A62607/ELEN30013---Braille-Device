@@ -4,7 +4,7 @@
 
 namespace braille
 {
-  // default starting state
+  // constructor
   BrailleTrainer::BrailleTrainer()
       : mode_(Mode::Learning),
         targetIndex_(0),
@@ -16,22 +16,26 @@ namespace braille
     return mode_;
   }
 
+  // set mode
   void BrailleTrainer::setMode(Mode newMode)
   {
     mode_ = newMode;
     resetPracticeSession();
   }
 
+  // get target letter
   char BrailleTrainer::targetLetter() const
   {
     return static_cast<char>('A' + targetIndex_);
   }
 
+  // get targe pattern
   uint8_t BrailleTrainer::targetPattern() const
   {
     return patternForIndex(targetIndex_);
   }
 
+  // set target letter
   bool BrailleTrainer::setTargetLetter(char letter)
   {
     if (letter >= 'a' && letter <= 'z')
@@ -77,15 +81,20 @@ namespace braille
     return entryPattern_;
   }
 
+  // updates user input pattern
   bool BrailleTrainer::raiseDot(uint8_t dotNumber)
   {
+    // whether input is allowed
     if (mode_ != Mode::Practice || answerVisible_ || dotNumber < 1 ||
         dotNumber > 6)
     {
       return false;
     }
 
+    // Create a bit representing that dot
     const uint8_t dotMask = uint8_t{1} << (dotNumber - 1);
+
+    // whether that dot is already raised
     if ((entryPattern_ & dotMask) != 0)
     {
       return false;

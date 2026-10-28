@@ -18,7 +18,7 @@ namespace braille
     Incorrect,
   };
 
-  // Hardware-independent state and rules for the two learning activities.
+  // Hardware-independent state and rules for learn and practice mode
   class BrailleTrainer
   {
   public:
